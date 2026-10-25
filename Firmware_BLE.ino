@@ -1572,7 +1572,7 @@ void prepararCorazonUI(){
  if(heartMaskReady)return;
  const float sx[2]={31.5f*0.8f,33.5f*0.8f};
  const float sy[2]={31.0f*0.8f,33.0f*0.8f};
- const float cx=42.0f,cy=59.0f;
+ const float cx=42.0f,cy=67.0f; // Heart only: 8 px lower; same size.
  for(int m=0;m<2;m++){
   for(int iy=0;iy<HEART_H;iy++){
    int16_t row[4]={-1,-1,-1,-1};
@@ -1610,8 +1610,8 @@ void dibujarFilaCorazonCompletaUI(const int16_t r[4],int y,uint16_t color){
 
 void dibujarReflejoCorazonUI(){
  // El reflejo permanece fijo durante el pulso: asi nunca hay un flash negro dentro del corazon.
- lcd.fillCircle(lroundf(42+(27-42)*0.8f),lroundf(59+(30-59)*0.8f),lroundf(6*0.8f),uiRosaClaro());
- lcd.fillCircle(lroundf(42+(24-42)*0.8f),lroundf(59+(27-59)*0.8f),lroundf(2*0.8f),lcd.color565(255,180,195));adquirir();
+ lcd.fillCircle(lroundf(42+(27-42)*0.8f),8+lroundf(59+(30-59)*0.8f),lroundf(6*0.8f),uiRosaClaro());
+ lcd.fillCircle(lroundf(42+(24-42)*0.8f),8+lroundf(59+(27-59)*0.8f),lroundf(2*0.8f),lcd.color565(255,180,195));adquirir();
 }
 
 void dibujarCorazonEstadoUI(bool grande){
@@ -1863,8 +1863,8 @@ void actualizarFrecuenciaCardiacaUI(){
    // El valor mostrado es el ultimo BPM validado por V9, siempre en blanco.
    char n[5];snprintf(n,sizeof(n),"%d",b);
    const GFXfont *fuenteBPM=(b>=100)?&FreeSansBold18pt7b:&FreeSansBold24pt7b;
-   textoCentroCajaUI(n,82,24,88,50,fuenteBPM,ST77XX_WHITE);
-   textoCentroCajaUI("LPM",86,80,82,20,&FreeSansBold9pt7b,uiGris());
+   textoCentroCajaUI(n,82,32,88,50,fuenteBPM,ST77XX_WHITE);
+   textoCentroCajaUI("LPM",86,88,82,20,&FreeSansBold9pt7b,uiGris());
   }
   previoBpm=b;previoModo=modo;
   if(confirmacion)confirmarRedibujoUI=0;
