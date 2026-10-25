@@ -113,35 +113,11 @@ const char *niveles[]={"Reposo","Leve","Moderado"};
 const char *fases[]={"LISTO","APOYA Y ESTABILIZA","BPM + SpO2 + PA","RETIRA EL DEDO"};
 const int LCD_MOSI=45, LCD_SCLK=40, LCD_CS=42; const int LCD_DC=41, LCD_RST=39, LCD_BL=46;
 
-// Screen-only timeout: keep LCD updates, sensors, processing and BLE running.
-// BOOT is active LOW. Each debounced press restarts the 45-second interval.
-const int SCREEN_BOOT_PIN=0;
-const uint32_t SCREEN_ON_MS=45000, SCREEN_DEBOUNCE_MS=30;
-uint32_t screenLastWake=0, screenButtonChanged=0;
+// Manual backlight only. Initialized before the BLE task starts; thereafter
+// the BLE worker is its sole owner. No timer, sensor sleep or acquisition changes.
 bool screenBacklightOn=true;
-int screenButtonRaw=HIGH, screenButtonStable=HIGH;
-
 void iniciarAhorroPantalla(){
- pinMode(SCREEN_BOOT_PIN,INPUT_PULLUP);
- screenButtonRaw=screenButtonStable=digitalRead(SCREEN_BOOT_PIN);
- screenLastWake=screenButtonChanged=millis();
  screenBacklightOn=true;digitalWrite(LCD_BL,HIGH);
-}
-
-void actualizarAhorroPantalla(){
- const uint32_t now=millis();
- const int raw=digitalRead(SCREEN_BOOT_PIN);
- if(raw!=screenButtonRaw){screenButtonRaw=raw;screenButtonChanged=now;}
- if(raw!=screenButtonStable && (uint32_t)(now-screenButtonChanged)>=SCREEN_DEBOUNCE_MS){
-  screenButtonStable=raw;
-  if(raw==LOW){
-   screenLastWake=now;
-   if(!screenBacklightOn){digitalWrite(LCD_BL,HIGH);screenBacklightOn=true;}
-  }
- }
- if(screenBacklightOn && (uint32_t)(now-screenLastWake)>=SCREEN_ON_MS){
-  digitalWrite(LCD_BL,LOW);screenBacklightOn=false;
- }
 }
 const uint32_t LCD_SPI_HZ=40000000; const uint8_t LCD_ROTACION=0; SPIClass spiLCD(FSPI);
 Adafruit_ST7789 lcd(&spiLCD, LCD_CS, LCD_DC, LCD_RST); bool pruebaTerminada=false,pausaEstadisticas=false;
@@ -1594,8 +1570,8 @@ bool puntoDentroCorazonUI(float xn,float yn){
 
 void prepararCorazonUI(){
  if(heartMaskReady)return;
- const float sx[2]={31.5f,33.5f};
- const float sy[2]={31.0f,33.0f};
+ const float sx[2]={31.5f*0.8f,33.5f*0.8f};
+ const float sy[2]={31.0f*0.8f,33.0f*0.8f};
  const float cx=42.0f,cy=59.0f;
  for(int m=0;m<2;m++){
   for(int iy=0;iy<HEART_H;iy++){
@@ -1634,8 +1610,8 @@ void dibujarFilaCorazonCompletaUI(const int16_t r[4],int y,uint16_t color){
 
 void dibujarReflejoCorazonUI(){
  // El reflejo permanece fijo durante el pulso: asi nunca hay un flash negro dentro del corazon.
- lcd.fillCircle(27,30,6,uiRosaClaro());
- lcd.fillCircle(24,27,2,lcd.color565(255,180,195));adquirir();
+ lcd.fillCircle(lroundf(42+(27-42)*0.8f),lroundf(59+(30-59)*0.8f),lroundf(6*0.8f),uiRosaClaro());
+ lcd.fillCircle(lroundf(42+(24-42)*0.8f),lroundf(59+(27-59)*0.8f),lroundf(2*0.8f),lcd.color565(255,180,195));adquirir();
 }
 
 void dibujarCorazonEstadoUI(bool grande){
@@ -2260,7 +2236,15 @@ class B18BLE {
       return;
     }
     if(!strncmp(cmd.text,"MODE:",5)){response("ERR:MODE:UNSUPPORTED");return;}
-    if(!strncmp(cmd.text,"SCREEN:",7)){response("ERR:SCREEN:UNSUP");return;}
+    if(!strcmp(cmd.text,"SCREEN:ON") || !strcmp(cmd.text,"SCREEN:OFF") || !strcmp(cmd.text,"SCREEN:GET")){
+      if(!v2){response("ERR:HELLO_REQUIRED");return;}
+      if(strcmp(cmd.text,"SCREEN:GET")){
+        screenBacklightOn=!strcmp(cmd.text,"SCREEN:ON");
+        digitalWrite(LCD_BL,screenBacklightOn?HIGH:LOW);
+      }
+      // ACK describes the applied GPIO state, not an optimistic Android toggle.
+      response(screenBacklightOn?"ACK:SCREEN:ON":"ACK:SCREEN:OFF");return;
+    }
     if(!strcmp(cmd.text,"!FORMAT")){response("ERR:FORMAT");return;}
     if(!strcmp(cmd.text,"GET:STATE")){
       if(!v2){response("ERR:HELLO_REQUIRED");return;}
@@ -2621,7 +2605,6 @@ void setup(){
  pantalla();
 }
 void loop(){
- actualizarAhorroPantalla();
  receivePA15();
  if(!listo){
   static uint32_t ultimoReintento=0;
